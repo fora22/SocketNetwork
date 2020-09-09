@@ -1,6 +1,11 @@
 #include <iostream>
-#include <vector>
 #include <string>
+#include <vector>
+#include <WinSock2.h>
+#include <random>
+#include <thread>
+#include <chrono>
+//#pragma comment (lib , "ws2_32.lib")
 using namespace std;
 
 int main(void)
