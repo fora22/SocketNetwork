@@ -5,8 +5,9 @@
 #include <random>
 #include <thread>
 #include <chrono>
-//#pragma comment (lib , "ws2_32.lib")
+#pragma comment (lib , "ws2_32.lib")
 using namespace std;
+
 
 int makeRand(void)
 {
@@ -20,7 +21,6 @@ int makeRand(void)
 
 int main(void)
 {
-	WORD wVersionRequested;
 	WSADATA wsaData;
 	SOCKADDR_IN serverAdress, clientAdress;
 	int err;
