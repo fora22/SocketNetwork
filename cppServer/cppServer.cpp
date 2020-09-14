@@ -23,9 +23,9 @@ int main(void)
 {
 	WSADATA wsaData;
 	SOCKADDR_IN serverAdress, clientAdress;
-	int err;
 
-	err = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	int err = WSAStartup(MAKEWORD(2, 2), &wsaData);
+
 	if (err != 0) {
 		cout << "WSAStartup error " << WSAGetLastError() << endl;
 		WSACleanup();
@@ -50,44 +50,33 @@ int main(void)
 		// reinterpret_cast에서 cast가 먼지?
 		cout << "Binding failed. Error code : " << WSAGetLastError() << endl;
 		WSACleanup();
-		return false;
+		return false;	
 	}
 	
 	cout << "client를 기다립니다." << endl;
 
 	listen(serverSocket, 5); // backlog(5)가 먼지?
 	int xx = sizeof(clientAdress);
-	SOCKET clientSocket = accept(serverSocket, reinterpret_cast<SOCKADDR*> (&clientAdress), &xx); // bind에서는 그냥 sizeof 쓰던데 왜 얘는 &(주소값)인지?
-	cout << "Connection Complete" << "새로운 Socket은 " << clientSocket << endl;
+	SOCKET chatSocket = accept(serverSocket, reinterpret_cast<SOCKADDR*> (&clientAdress), &xx); // bind에서는 그냥 sizeof 쓰던데 왜 얘는 &(주소값)인지?
+	cout << "Connection Complete " << "새로운 Socket은 " << chatSocket << endl;
 
 	int receiveNumber;
-	char communicationBuffer[100];
+	char communicationBuffer[8192]; // 1024 * 8 byte
 	int iRand;
 	int bytesSent;
+	int i = 0;
 	while (TRUE)
 	{
-		receiveNumber = recv(clientSocket, communicationBuffer, 100, 0); // flag는 뭔지?
-		if (receiveNumber <= 0) { cout << "Got nothing" << endl; break; }
+		receiveNumber = recv(chatSocket, communicationBuffer, 100, 0); // flag는 뭔지?
 		communicationBuffer[receiveNumber] = 0;
+		cout << "received Message from Client : " << communicationBuffer << endl;
+		if (receiveNumber <= 0) { cout << "Got nothing" << endl; break; }
 
-		if (!strcmp(communicationBuffer, "Hello"))
-		{
-			iRand = makeRand();
-			auto sRand = to_string(iRand);
-			cout << "Sending Random Number " << iRand << "to the client" << endl;
-			bytesSent = send(clientSocket, sRand.c_str(), sRand.length(), 0);
+		string sNumber = communicationBuffer;
 
-			continue;
-		}
-		string sNumber(communicationBuffer);
 		try
 		{
-			iRand = stoi(sNumber);
-			cout << "Server got " << "\"" << iRand << "\"" << endl;
-			this_thread::sleep_for(chrono::seconds(1));
-			cout << "Sending \"" << iRand++ << "\"" << " to Client" << endl;
-			auto sRand = to_string(iRand);
-			bytesSent = send(clientSocket, sRand.c_str(), sRand.length(), 0);
+			bytesSent = send(chatSocket, sNumber.c_str(), sNumber.length(), 0);
 		}
 		catch (const invalid_argument& ex)
 		{
@@ -100,6 +89,10 @@ int main(void)
 			cerr << "Invalid argument while converting string to number" << endl;
 			cerr << "Error : " << ex.what() << endl;
 			break;
+		}
+		catch (const exception& expn)
+		{
+			cout << expn.what() << endl;
 		}
 	}
 	
