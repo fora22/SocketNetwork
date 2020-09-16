@@ -6,6 +6,8 @@
 #pragma comment (lib , "ws2_32.lib")
 using namespace std;
 
+bool sendThreadStart;
+bool recvThreadStart;
 
 void stillReceiving(SOCKET* recvSocket, char* buffer, string* rMessage) {
 	int messageLength;
@@ -14,6 +16,8 @@ void stillReceiving(SOCKET* recvSocket, char* buffer, string* rMessage) {
 		messageLength = recv(*recvSocket, buffer, strlen(buffer), 0);
 		buffer[messageLength] = 0;
 		*rMessage = buffer;
+		cout << *rMessage << endl;
+		sendThreadStart = TRUE;
 	}
 }
 
@@ -24,7 +28,10 @@ void stillSending(SOCKET* sendSocket, string* sMessage)
 	{
 		try
 		{
-			sendCheck = send(*sendSocket, (*sMessage).c_str(), (*sMessage).length(), 0);
+			if (sendThreadStart) {
+				sendCheck = send(*sendSocket, (*sMessage).c_str(), (*sMessage).length(), 0);
+				sendThreadStart = FALSE;
+			}
 		}
 		catch (const invalid_argument& ex)
 		{
@@ -99,6 +106,16 @@ int main(void)
 
 	thread recvData(stillReceiving, chatSocketPtr, communicationBuffer, recvMessagePtr);
 	thread sendData(stillSending, chatSocketPtr, recvMessagePtr);
+	while (TRUE) {
+		
+		if (sendThreadStart == FALSE) {
+			SuspendThread(sendData.native_handle());
+			break;
+		}
+		else {
+			ResumeThread(sendData.native_handle());
+		}
+	}
 
 	/*recvData.detach();
 	sendData.detach();*/

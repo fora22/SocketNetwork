@@ -1,6 +1,7 @@
 #include <iostream>
 #include <thread>
 using namespace std;
+#include <WinSock2.h>
 
 void func1(void) {
     for (int i = 0; i < 10; i++)
@@ -22,6 +23,8 @@ void func3(void) {
         cout << "thread_3" << endl;
     }
 }
+
+
 
 
 int main(void)

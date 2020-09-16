@@ -66,7 +66,7 @@ int main(void)
                 byteSend = send(clientSocket, sendMessage.c_str(), sendMessage.length(), 0);
             }
             in.close();*/
-            //byteSend = send(clientSocket, sendMessage.c_str(), sendMessage.length(), 0);
+            byteSend = send(clientSocket, sendMessage.c_str(), sendMessage.length(), 0);
 
             receiveClientNumber = recv(clientSocket, clientBuffer, strlen(clientBuffer), 0); // read max 50 bytes
 
@@ -74,8 +74,6 @@ int main(void)
             clientBuffer[receiveClientNumber] = 0; // make a string
 
             cout << "Received from Server : " << clientBuffer << endl;
-
-            break;
         }
         catch (const invalid_argument& ex)
         {
