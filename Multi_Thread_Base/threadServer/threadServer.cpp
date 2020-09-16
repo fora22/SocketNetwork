@@ -2,21 +2,48 @@
 #include <string>
 #include <vector>
 #include <WinSock2.h>
-#include <random>
 #include <thread>
-#include <chrono>
 #pragma comment (lib , "ws2_32.lib")
 using namespace std;
 
 
-int makeRand(void)
-{
-	// 무엇?
-	random_device rd;
-	mt19937 rng(rd());
-	uniform_int_distribution<int> ud(1, 1024);
+void stillReceiving(SOCKET* recvSocket, char* buffer, string* rMessage) {
+	int messageLength;
+	while (TRUE)
+	{
+		messageLength = recv(*recvSocket, buffer, strlen(buffer), 0);
+		buffer[messageLength] = 0;
+		*rMessage = buffer;
+	}
+}
 
-	return ud(rng);
+void stillSending(SOCKET* sendSocket, string* sMessage)
+{
+	int sendCheck;
+	while (TRUE)
+	{
+		try
+		{
+			sendCheck = send(*sendSocket, (*sMessage).c_str(), (*sMessage).length(), 0);
+		}
+		catch (const invalid_argument& ex)
+		{
+			cerr << "Invalid argument while converting string to number" << endl;
+			cerr << "Error : " << ex.what() << endl;
+			break;
+		}
+		catch (const out_of_range& ex)
+		{
+			cerr << "Invalid argument while converting string to number" << endl;
+			cerr << "Error : " << ex.what() << endl;
+			break;
+		}
+		catch (const exception& expn)
+		{
+			cout << expn.what() << endl;
+			break;
+		}
+	}
 }
 
 int main(void)
@@ -59,42 +86,55 @@ int main(void)
 	int xx = sizeof(clientAdress);
 	SOCKET chatSocket = accept(serverSocket, reinterpret_cast<SOCKADDR*> (&clientAdress), &xx); // bind에서는 그냥 sizeof 쓰던데 왜 얘는 &(주소값)인지?
 	cout << "Connection Complete " << "새로운 Socket은 " << chatSocket << endl;
+	SOCKET* chatSocketPtr = &chatSocket;
+	
 
 	int receiveNumber;
 	char communicationBuffer[8192]; // 1024 * 8 byte
 	int iRand;
 	int bytesSent;
 	int i = 0;
-	while (TRUE)
-	{
-		receiveNumber = recv(chatSocket, communicationBuffer, 100, 0); // flag는 뭔지?
-		communicationBuffer[receiveNumber] = 0;
-		cout << "received Message from Client : " << communicationBuffer << endl;
-		if (receiveNumber <= 0) { cout << "Got nothing" << endl; break; }
+	string recvMessage;
+	string* recvMessagePtr = &recvMessage;
 
-		string sNumber = communicationBuffer;
+	thread recvData(stillReceiving, chatSocketPtr, communicationBuffer, recvMessagePtr);
+	thread sendData(stillSending, chatSocketPtr, recvMessagePtr);
 
-		try
-		{
-			bytesSent = send(chatSocket, sNumber.c_str(), sNumber.length(), 0);
-		}
-		catch (const invalid_argument& ex)
-		{
-			cerr << "Invalid argument while converting string to number" << endl;
-			cerr << "Error : " << ex.what() << endl;
-			break;
-		}
-		catch (const out_of_range& ex)
-		{
-			cerr << "Invalid argument while converting string to number" << endl;
-			cerr << "Error : " << ex.what() << endl;
-			break;
-		}
-		catch (const exception& expn)
-		{
-			cout << expn.what() << endl;
-		}
-	}
+	/*recvData.detach();
+	sendData.detach();*/
+	recvData.join();
+	sendData.join();
+
+	//while (TRUE)
+	//{
+	//	receiveNumber = recv(chatSocket, communicationBuffer, 100, 0); // flag는 뭔지?
+	//	communicationBuffer[receiveNumber] = 0;
+	//	cout << "received Message from Client : " << communicationBuffer << endl;
+	//	if (receiveNumber <= 0) { cout << "Got nothing" << endl; break; }
+
+	//	string sNumber = communicationBuffer;
+
+	//	try
+	//	{
+	//		bytesSent = send(chatSocket, sNumber.c_str(), sNumber.length(), 0);
+	//	}
+	//	catch (const invalid_argument& ex)
+	//	{
+	//		cerr << "Invalid argument while converting string to number" << endl;
+	//		cerr << "Error : " << ex.what() << endl;
+	//		break;
+	//	}
+	//	catch (const out_of_range& ex)
+	//	{
+	//		cerr << "Invalid argument while converting string to number" << endl;
+	//		cerr << "Error : " << ex.what() << endl;
+	//		break;
+	//	}
+	//	catch (const exception& expn)
+	//	{
+	//		cout << expn.what() << endl;
+	//	}
+	//}
 
 	closesocket(serverSocket);
 	WSACleanup();

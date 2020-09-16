@@ -53,19 +53,19 @@ int main(void)
     char clientBuffer[8192]; // 1024 * 8 byte
 
     // file open
-    ifstream in("test.txt");
+    //ifstream in("test.txt");
 
 
     while (true)
     {
         try
         {
-            //cout << "Please send Message : ";
-            //getline(cin, sendMessage);
-            while (getline(in, sendMessage)) {
+            cout << "Please send Message : ";
+            getline(cin, sendMessage);
+            /*hile (getline(in, sendMessage)) {
                 byteSend = send(clientSocket, sendMessage.c_str(), sendMessage.length(), 0);
             }
-            in.close();
+            in.close();*/
             //byteSend = send(clientSocket, sendMessage.c_str(), sendMessage.length(), 0);
 
             receiveClientNumber = recv(clientSocket, clientBuffer, strlen(clientBuffer), 0); // read max 50 bytes
