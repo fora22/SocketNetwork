@@ -1,22 +1,53 @@
-#include <iostream>
-#include <string>
-#include <vector>
-#include <WinSock2.h>
-#include <random>
-#include <thread>
-#include <chrono>
-#include <fstream>
-
-#pragma comment (lib , "ws2_32.lib")
+#define HAVE_STRUCT_TIMESPEC
 #define SERVER_PORT 11235
 #define SERVER_IP_ADDRES "127.0.0.1"
+
+#include <iostream>
+#include <string>
+#include <WinSock2.h>
+#include <pthread.h>
+
+#pragma comment (lib , "ws2_32.lib")
+
 using namespace std;
 
+struct socketArg
+{
+    SOCKET* recvSocket;
+    char* buffer;
+    string* rMessage;
+};
+
+void socketSend(SOCKET* sSocket, string* sMessage) {
+    // socketArg* sendSocketArg = (socketArg*)(&socket_arg);	// struct 형으로 cast함
+
+    // int sendCheck;
+    // sendCheck = send(*(sendSocketArg->recvSocket), (*(sendSocketArg->rMessage)).c_str(), (*(sendSocketArg->rMessage)).length(), 0);  
+    int sendCheck;
+    sendCheck = send(*sSocket, (*sMessage).c_str(), (*sMessage).length(), 0);
+}
+
+//SOCKET* recvSocket, char* buffer, string* rMessage
+void* socketReceive(void* socket_arg) {
+    socketArg* recvSocketArg = (socketArg*)(&socket_arg);	// struct 형으로 cast함
+
+    int messageLength = 0;
+    while (true)
+    {
+        messageLength = recv(*(recvSocketArg->recvSocket), recvSocketArg->buffer, strlen(recvSocketArg->buffer), 0);
+        if (messageLength > 0)
+        {
+            recvSocketArg->buffer[messageLength] = 0;
+            *(recvSocketArg->rMessage) = recvSocketArg->buffer;
+            cout << *(recvSocketArg->rMessage) << endl;
+        }
+    }
+}
 
 int main(void)
 {
     WSADATA wsaData;
-    SOCKADDR_IN target;
+    SOCKADDR_IN sAdress;
 
     int err = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
@@ -26,9 +57,9 @@ int main(void)
         return 0;
     }
 
-    target.sin_family = AF_INET;
-    target.sin_port = htons(SERVER_PORT);
-    target.sin_addr.s_addr = inet_addr(SERVER_IP_ADDRES);
+    sAdress.sin_family = AF_INET;
+    sAdress.sin_port = htons(SERVER_PORT);
+    sAdress.sin_addr.s_addr = inet_addr(SERVER_IP_ADDRES);
 
     SOCKET clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);  // create socket
 
@@ -38,7 +69,7 @@ int main(void)
         return 0;
     }
 
-    if (connect(clientSocket, reinterpret_cast<SOCKADDR*>(&target), sizeof(target)) == SOCKET_ERROR)
+    if (connect(clientSocket, reinterpret_cast<SOCKADDR*>(&sAdress), sizeof(sAdress)) == SOCKET_ERROR)
     {
         cout << "connect() error : " << WSAGetLastError() << endl;
         cout << "서버 먼저 실행해주세요." << endl;
@@ -47,48 +78,37 @@ int main(void)
     }
 
     // Connect Complete
-    string sendMessage;
-    int byteSend;
-    int receiveClientNumber;
+    cout << "Connect Complete" << endl;
+    
     char clientBuffer[8192]; // 1024 * 8 byte
+    string clientMessage;
+    int clientRecvStatus = 0;		// thread 종료 시 반환하는 값 저장 변수
+    int clientSendStatus = 0;		// thread 종료 시 반환하는 값 저장 변수
 
-    // file open
-    //ifstream in("test.txt");
+    // pthread id 만들기
+    pthread_t clientRecvPosix;
+    pthread_t clientSendPosix;
 
+    // struct 만들기
+    socketArg* socket_arg = new socketArg;	// 함수에 넣어줄 데이터(인자)가 많기 때문에 struct로 형성해서 한 번에 넘겨줌
+    socket_arg->recvSocket = &clientSocket;
+    socket_arg->buffer = clientBuffer;
+    socket_arg->rMessage = &clientMessage;
 
+    int phtreadRecvCheck = pthread_create(&clientRecvPosix, NULL, socketReceive, (void*)socket_arg);
+    // int pthreadSendCheck = pthread_create(&clientSendPosix, NULL, socketSend, (void*)socket_arg);
+   
     while (true)
     {
-        try
-        {
-            cout << "Please send Message : ";
-            getline(cin, sendMessage);
-            /*hile (getline(in, sendMessage)) {
-                byteSend = send(clientSocket, sendMessage.c_str(), sendMessage.length(), 0);
-            }
-            in.close();*/
-            byteSend = send(clientSocket, sendMessage.c_str(), sendMessage.length(), 0);
-
-            receiveClientNumber = recv(clientSocket, clientBuffer, strlen(clientBuffer), 0); // read max 50 bytes
-
-            if (receiveClientNumber <= 0) { cout << "Got Nothing" << endl; break; }
-            clientBuffer[receiveClientNumber] = 0; // make a string
-
-            cout << "Received from Server : " << clientBuffer << endl;
-        }
-        catch (const invalid_argument& ex)
-        {
-            cerr << "Invalid argument while converting string to number" << endl;
-            cerr << "Error: " << ex.what() << endl;
-            break;
-        }
-        catch (const out_of_range& ex)
-        {
-            cerr << "Invalid argument while converting string to number" << endl;
-            cerr << "Error: " << ex.what() << endl;
-            break;
-        }
+        cout << "Message : ";
+        cin >> clientMessage;
+        socketSend(&clientSocket, &clientMessage);
     }
+    
+    pthread_join(clientRecvPosix, (void**)clientRecvStatus);
+    // pthread_join(clientSendPosix, (void**)clientSendStatus);
 
+    delete socket_arg;
     closesocket(clientSocket);
     WSACleanup();
 

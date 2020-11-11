@@ -1,160 +1,113 @@
+#define HAVE_STRUCT_TIMESPEC
+#define SERVER_PORT 11235
+#define SERVER_IP_ADDRES "127.0.0.1"
+#define BUFFER_SIZE 8192	// 1024 * 8 byte
+
 #include <iostream>
 #include <string>
-#include <vector>
 #include <WinSock2.h>
-#include <thread>
+#include <pthread.h>
+
 #pragma comment (lib , "ws2_32.lib")
+
 using namespace std;
 
-bool sendThreadStart;
-bool recvThreadStart;
-
-void stillReceiving(SOCKET* recvSocket, char* buffer, string* rMessage) {
-	int messageLength;
-	while (TRUE)
-	{
-		messageLength = recv(*recvSocket, buffer, strlen(buffer), 0);
-		buffer[messageLength] = 0;
-		*rMessage = buffer;
-		cout << *rMessage << endl;
-		sendThreadStart = TRUE;
-	}
-}
-
-void stillSending(SOCKET* sendSocket, string* sMessage)
+struct socketArg
 {
+	SOCKET* recvSocket;
+	char* buffer;
+	string* rMessage;
+};
+
+void socketSend(SOCKET* sendSocket, string* sMessage) {
 	int sendCheck;
+	sendCheck = send(*sendSocket, (*sMessage).c_str(), (*sMessage).length(), 0);
+}
+
+//SOCKET* recvSocket, char* buffer, string* rMessage
+void *socketReceive(void *socket_arg) {
+	socketArg* my_socket_arg = (socketArg*)(socket_arg);	// struct 형으로 cast함
+	
+	int messageLength = 0 ;
 	while (TRUE)
 	{
-		try
-		{
-			if (sendThreadStart) {
-				sendCheck = send(*sendSocket, (*sMessage).c_str(), (*sMessage).length(), 0);
-				sendThreadStart = FALSE;
-			}
-		}
-		catch (const invalid_argument& ex)
-		{
-			cerr << "Invalid argument while converting string to number" << endl;
-			cerr << "Error : " << ex.what() << endl;
-			break;
-		}
-		catch (const out_of_range& ex)
-		{
-			cerr << "Invalid argument while converting string to number" << endl;
-			cerr << "Error : " << ex.what() << endl;
-			break;
-		}
-		catch (const exception& expn)
-		{
-			cout << expn.what() << endl;
-			break;
+		messageLength = recv(*(my_socket_arg->recvSocket), my_socket_arg->buffer, strlen(my_socket_arg->buffer), 0);
+		if (messageLength > 0) {
+			my_socket_arg->buffer[messageLength] = 0;
+			*(my_socket_arg->rMessage) = my_socket_arg->buffer;
+			cout << *(my_socket_arg->rMessage) << endl;
+			socketSend((my_socket_arg->recvSocket), (my_socket_arg->rMessage));
+		} else {
+			cout << "can't recv" << endl;
+			exit(1);
 		}
 	}
 }
 
-int main(void)
-{
+int main(void) {
 	WSADATA wsaData;
-	SOCKADDR_IN serverAdress, clientAdress;
+	SOCKADDR_IN sAdress, cAdress;		// serverAdress, ClientAdress
 
 	int err = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
 	if (err != 0) {
-		cout << "WSAStartup error " << WSAGetLastError() << endl;
+		cout << "WSAStartup error" << WSAGetLastError() << endl;
 		WSACleanup();
-		return false;
+		return 1;
 	}
 
-	serverAdress.sin_family = AF_INET; // AF_INET은 뭔지??
-	serverAdress.sin_port = htons(11235);
-	serverAdress.sin_addr.s_addr = inet_addr("127.0.0.1"); // s_addr은 그냥 쓰던데 왜?
+	sAdress.sin_family = AF_INET;
+	sAdress.sin_port = htons(SERVER_PORT);
+	sAdress.sin_addr.s_addr = inet_addr(SERVER_IP_ADDRES);
 
-	SOCKET serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	SOCKET sSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-	if (serverSocket == INVALID_SOCKET)
+	if (sSocket == INVALID_SOCKET)
 	{
 		cout << "Socket Error" << WSAGetLastError() << endl;
 		WSACleanup();
 		return false; // 소켓 생성 실패시 실행
 	}
 
-	if (bind(serverSocket, reinterpret_cast<SOCKADDR*> (&serverAdress), sizeof(serverAdress)))
+	if (bind(sSocket, reinterpret_cast<SOCKADDR*> (&sAdress), sizeof(sAdress)))
 	{
 		// reinterpret_cast에서 cast가 먼지?
 		cout << "Binding failed. Error code : " << WSAGetLastError() << endl;
 		WSACleanup();
 		return false;
 	}
-
 	cout << "client를 기다립니다." << endl;
 
-	listen(serverSocket, 5); // backlog(5)가 먼지?
-	int xx = sizeof(clientAdress);
-	SOCKET chatSocket = accept(serverSocket, reinterpret_cast<SOCKADDR*> (&clientAdress), &xx); // bind에서는 그냥 sizeof 쓰던데 왜 얘는 &(주소값)인지?
+	listen(sSocket, 5);
+	int sizeCAdress = sizeof(cAdress);
+	SOCKET chatSocket = accept(sSocket, reinterpret_cast<SOCKADDR*> (&cAdress), &sizeCAdress);
 	cout << "Connection Complete " << "새로운 Socket은 " << chatSocket << endl;
 	SOCKET* chatSocketPtr = &chatSocket;
 
-
 	int receiveNumber;
-	char communicationBuffer[8192]; // 1024 * 8 byte
-	int iRand;
-	int bytesSent;
-	int i = 0;
-	string recvMessage;
-	string* recvMessagePtr = &recvMessage;
+	char commuBuffer[BUFFER_SIZE]; // 1024 * 8 byte
+	string commuMessage;
+	int status = 0;		// thread 종료 시 반환하는 값 저장 변수
 
-	thread recvData(stillReceiving, chatSocketPtr, communicationBuffer, recvMessagePtr);
-	thread sendData(stillSending, chatSocketPtr, recvMessagePtr);
-	while (TRUE) {
+	pthread_t posix;
+	socketArg* socket_arg = new socketArg;	// 함수에 넣어줄 데이터(인자)가 많기 때문에 struct로 형성해서 한 번에 넘겨줌
+	socket_arg->recvSocket = &chatSocket;
+	socket_arg->buffer = commuBuffer;
+	socket_arg->rMessage = &commuMessage;
 
-		if (sendThreadStart == FALSE) {
-			SuspendThread(sendData.native_handle());
-			break;
-		}
-		else {
-			ResumeThread(sendData.native_handle());
-		}
-	}
+	int pthreadCheck = pthread_create(&posix, NULL, socketReceive, (void*)socket_arg);	// void* 형은 모든 자료형 타입을 가르킬 수 있기 때문에 나중에 cast하면 됨
 
-	/*recvData.detach();
-	sendData.detach();*/
-	recvData.join();
-	sendData.join();
+	pthread_join(posix, (void **)status);
 
-	//while (TRUE)
-	//{
-	//	receiveNumber = recv(chatSocket, communicationBuffer, 100, 0); // flag는 뭔지?
-	//	communicationBuffer[receiveNumber] = 0;
-	//	cout << "received Message from Client : " << communicationBuffer << endl;
-	//	if (receiveNumber <= 0) { cout << "Got nothing" << endl; break; }
 
-	//	string sNumber = communicationBuffer;
+	cout << "return thread " << status << endl;
 
-	//	try
-	//	{
-	//		bytesSent = send(chatSocket, sNumber.c_str(), sNumber.length(), 0);
-	//	}
-	//	catch (const invalid_argument& ex)
-	//	{
-	//		cerr << "Invalid argument while converting string to number" << endl;
-	//		cerr << "Error : " << ex.what() << endl;
-	//		break;
-	//	}
-	//	catch (const out_of_range& ex)
-	//	{
-	//		cerr << "Invalid argument while converting string to number" << endl;
-	//		cerr << "Error : " << ex.what() << endl;
-	//		break;
-	//	}
-	//	catch (const exception& expn)
-	//	{
-	//		cout << expn.what() << endl;
-	//	}
-	//}
-
-	closesocket(serverSocket);
+	// server 종료
+	delete socket_arg;
+	closesocket(chatSocket);
+	closesocket(sSocket);
 	WSACleanup();
+
 
 	return 0;
 }
