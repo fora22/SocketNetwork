@@ -16,5 +16,26 @@ namespace SocketClient_1
         {
             InitializeComponent();
         }
+
+        private void SendButton_Click(object sender, EventArgs e)
+        {
+            ChatWindow.Text = ChatWindow.Text + "\n" + InputWindow.Text;
+            InputWindow.Clear();
+        }
+
+        private void SendButton_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Shift && e.KeyCode == Keys.Enter) {
+                InputWindow.Text = InputWindow + "\n";
+                InputWindow.SelectionStart = InputWindow.Text.Length;
+            } else if (e.KeyCode = Keys.Enter) {
+                InputWindow.Text = ChatWindow.Text + "\n" + InputWindow.Text;
+
+                stirng msg = InputWindow.Text;
+
+                // Socket Send need
+            }
+                        
+        }
     }
 }
