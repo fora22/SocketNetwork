@@ -28,11 +28,14 @@ namespace SocketClient_1
             if (e.Shift && e.KeyCode == Keys.Enter) {
                 InputWindow.Text = InputWindow + "\n";
                 InputWindow.SelectionStart = InputWindow.Text.Length;
-            } else if (e.KeyCode = Keys.Enter) {
+            } else if (e.KeyCode == Keys.Enter) {
                 InputWindow.Text = ChatWindow.Text + "\n" + InputWindow.Text;
+                
+                string msg = InputWindow.Text;
 
-                stirng msg = InputWindow.Text;
+                byte[] sBuffer = Encoding.UTF8.GetBytes(msg);
 
+                InputWindow.Clear();
                 // Socket Send need
             }
                         
